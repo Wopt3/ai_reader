@@ -1,11 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, Form,Depends
+from sqlalchemy.orm import Session
 import database
 
-
+import shutil
 
 app = FastAPI()
-
-
+database.Base.metadata.create_all(bind=database.engine)
 
 @app.get("/")
 def read_root():
@@ -15,7 +15,7 @@ def read_root():
 def read_items(user_name: str):
     pass
 
-@app.get("/library/pdf/{pdf_id")
+@app.get("/library/pdf/{pdf_id}")
 def read_item(pdf_id: int):
     pass
 
@@ -23,9 +23,28 @@ def read_item(pdf_id: int):
 def register(login:str, password:str):
     pass
 
-@app.post("/send-pdf/{pdf_id}")
-async def send_pdf(pdf_id: int):
-    pass
+@app.post("/upload-pdf/")
+async def upload_pdf(
+        user_id: str=Form(...),
+        file: UploadFile=File(...),
+        db: Session = Depends(database.get_db)
+    ):
+    path=f"pdf_files/{file.filename}"
+
+    with open(path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    new_pdf=database.PDF(
+        path=f"pdf_files/{file.filename}",
+        title=file.filename,
+        pages='0',#TEMPORARY
+        user=user_id
+    )
+
+    db.add(new_pdf)
+    db.commit()
+    db.refresh(new_pdf)
+
+    return{"message ": f"{user_id}, {file.filename}, {file.content_type}, {file.size}"}
 
 @app.delete("/delete/{pdf_id}")
 def delete(pdf_id: int):
