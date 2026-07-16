@@ -14,12 +14,19 @@ def read_root():
     return {"Hello": "World"}
 
 @app.get("/library/{user_name}")
-def read_items(user_name: str):
-    pass
+def read_items(user_name: str, db: Session = Depends(database.get_db)):
+    pdfs = db.query(database.PDF).filter(database.PDF.user == user_name).all()
+    return pdfs
 
 @app.get("/library/pdf/{pdf_id}")
-def read_item(pdf_id: int):
-    pass
+def read_item(pdf_id: int,
+              db: Session = Depends(database.get_db)):
+        pdf = db.query(database.PDF).filter(database.PDF.id == pdf_id).first()
+        if pdf is None:
+            return {"message": "PDF not found"}
+        return pdf
+
+    
 
 @app.post("/register")
 def register(login:str, password:str):
