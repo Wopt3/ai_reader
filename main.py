@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 import database
 
 import shutil
+import os
+import pdfPageCounter
 
 app = FastAPI()
 database.Base.metadata.create_all(bind=database.engine)
@@ -30,13 +32,12 @@ async def upload_pdf(
         db: Session = Depends(database.get_db)
     ):
     path=f"pdf_files/{file.filename}"
-
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     new_pdf=database.PDF(
         path=f"pdf_files/{file.filename}",
         title=file.filename,
-        pages='0',#TEMPORARY
+        pages=pdfPageCounter.get_pdf_page_count(path),
         user=user_id
     )
 
@@ -44,11 +45,27 @@ async def upload_pdf(
     db.commit()
     db.refresh(new_pdf)
 
-    return{"message ": f"{user_id}, {file.filename}, {file.content_type}, {file.size}"}
+    return{"message": f"succes"}
 
 @app.delete("/delete/{pdf_id}")
-def delete(pdf_id: int):
-    pass
+async def delete(pdf_id: int,
+           db: Session = Depends(database.get_db)
+    ):
+    pdf = db.query(database.PDF).filter(database.PDF.id == pdf_id).first()
+    if pdf:
+        pdf_path = pdf.path
+        db.delete(pdf)
+        db.commit()
+        try:
+            os.remove(pdf_path)
+        except:
+            return {"message": "Error 404"}
+
+        return {"status": "Success","message": "Deleted Successfully"}
+    else:
+        return {"status": "error", "message": "Pdf not found"}
+
+
 
 @app.put("/change-conf")
 def change_conf():

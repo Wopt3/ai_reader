@@ -21,5 +21,5 @@ class PDF(Base):
     id = Column(Integer, primary_key=True)
     path = Column(String)
     title = Column(String)
-    pages = Column(String)
+    pages = Column(Integer)
     user = Column(String)
