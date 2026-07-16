@@ -16,6 +16,8 @@ def read_root():
 @app.get("/library/{user_name}")
 def read_items(user_name: str, db: Session = Depends(database.get_db)):
     pdfs = db.query(database.PDF).filter(database.PDF.user == user_name).all()
+    if not pdfs:
+        return {"message": "No PDFs found for this user"}
     return pdfs
 
 @app.get("/library/pdf/{pdf_id}")
