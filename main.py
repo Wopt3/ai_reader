@@ -38,6 +38,7 @@ async def upload_pdf(
             i+=1
         else:
             break
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     new_pdf=database.PDF(
