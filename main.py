@@ -31,11 +31,17 @@ async def upload_pdf(
         file: UploadFile=File(...),
         db: Session = Depends(database.get_db)
     ):
-    path=f"pdf_files/{file.filename}"
+    i:int = 0
+    while True:
+        path = f"pdf_files/{file.filename}_{i}"
+        if os.path.exists(path):
+            i+=1
+        else:
+            break
     with open(path, "wb") as f:
         shutil.copyfileobj(file.file, f)
     new_pdf=database.PDF(
-        path=f"pdf_files/{file.filename}",
+        path=path,
         title=file.filename,
         pages=pdfPageCounter.get_pdf_page_count(path),
         user=user_id
