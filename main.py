@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form,Depends
+from fastapi import FastAPI, File, UploadFile, Form, Depends
 from sqlalchemy.orm import Session
 import database
 
