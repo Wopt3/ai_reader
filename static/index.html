@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Book Reader & TTS Sync</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: rgba(17, 24, 39, 0.7);
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #7c3aed;
+            --accent-primary-glow: rgba(124, 58, 237, 0.4);
+            --accent-secondary: #10b981;
+            --accent-secondary-glow: rgba(16, 185, 129, 0.4);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-highlight: #f5f3ff;
+            --highlight-bg: rgba(124, 58, 237, 0.25);
+            --highlight-border: rgba(124, 58, 237, 0.6);
+            --hover-bg: rgba(255, 255, 255, 0.04);
+            --transition-speed: 0.2s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 45%);
+            background-attachment: fixed;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--panel-border);
+            backdrop-filter: blur(8px);
+            background-color: rgba(11, 15, 25, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 2.25rem;
+            height: 2.25rem;
+            background: linear-gradient(135deg, var(--accent-primary), #a78bfa);
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 15px var(--accent-primary-glow);
+        }
+
+        .logo-icon svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            fill: #fff;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: var(--hover-bg);
+            border: 1px solid var(--panel-border);
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+        }
+
+        .user-badge input {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            outline: none;
+            width: 100px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            flex-grow: 1;
+            height: calc(100vh - 73px);
+            overflow: hidden;
+        }
+
+        /* Sidebar Styling */
+        aside {
+            border-right: 1px solid var(--panel-border);
+            background-color: rgba(17, 24, 39, 0.45);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            gap: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .section-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title svg {
+            width: 1.1rem;
+            height: 1.1rem;
+            fill: var(--accent-primary);
+        }
+
+        /* Upload Area */
+        .upload-zone {
+            border: 2px dashed rgba(124, 58, 237, 0.3);
+            border-radius: 0.75rem;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent-primary);
+            background-color: rgba(124, 58, 237, 0.05);
+            box-shadow: 0 0 15px rgba(124, 58, 237, 0.1);
+        }
+
+        .upload-zone svg {
+            width: 2rem;
+            height: 2rem;
+            stroke: var(--text-muted);
+            transition: all var(--transition-speed);
+        }
+
+        .upload-zone:hover svg {
+            stroke: var(--accent-primary);
+            transform: translateY(-3px);
+        }
+
+        .upload-zone p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .upload-zone span {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        /* Library List */
+        .library-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            overflow-y: auto;
+            max-height: 350px;
+        }
+
+        .book-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            background-color: var(--hover-bg);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+
+        .book-item:hover {
+            border-color: var(--panel-border);
+            background-color: rgba(255, 255, 255, 0.06);
+            transform: translateX(2px);
+        }
+
+        .book-item.active {
+            border-color: var(--accent-primary);
+            background-color: rgba(124, 58, 237, 0.08);
+            box-shadow: 0 0 10px rgba(124, 58, 237, 0.1);
+        }
+
+        .book-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            overflow: hidden;
+            flex-grow: 1;
+            padding-right: 0.5rem;
+        }
+
+        .book-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .book-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .delete-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-speed);
+            opacity: 0.6;
+        }
+
+        .delete-btn:hover {
+            background-color: rgba(239, 68, 68, 0.15);
+            opacity: 1;
+        }
+
+        .delete-btn svg {
+            width: 1.1rem;
+            height: 1.1rem;
+            fill: #ef4444;
+        }
+
+        /* Main Workspace */
+        main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: rgba(11, 15, 25, 0.3);
+            position: relative;
+        }
+
+        /* Tabs and Controls Header */
+        .workspace-header {
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(17, 24, 39, 0.3);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 0.25rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--panel-border);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tab-btn svg {
+            width: 0.95rem;
+            height: 0.95rem;
+            fill: currentColor;
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent-primary);
+            color: #fff;
+            box-shadow: 0 0 10px var(--accent-primary-glow);
+        }
+
+        /* TTS Controller styling */
+        .tts-controller {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .control-group select, .control-group input[type="range"] {
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            outline: none;
+            font-size: 0.8rem;
+        }
+
+        .control-group input[type="range"] {
+            width: 80px;
+            accent-color: var(--accent-primary);
+        }
+
+        .tts-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-left: 0.5rem;
+        }
+
+        .circle-btn {
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 50%;
+            border: 1px solid var(--panel-border);
+            background-color: var(--panel-bg);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+
+        .circle-btn:hover {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px var(--accent-primary-glow);
+            transform: scale(1.05);
+        }
+
+        .circle-btn svg {
+            width: 1rem;
+            height: 1rem;
+            fill: currentColor;
+        }
+
+        /* Content Container */
+        .workspace-content {
+            flex-grow: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .content-panel {
+            width: 100%;
+            max-width: 800px;
+            display: none;
+        }
+
+        .content-panel.active {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Reader Area */
+        .reader-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 1rem;
+            padding: 2.5rem;
+            flex-grow: 1;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(16px);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .reader-title-bar {
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reader-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .page-navigation {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-btn {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            padding: 0.35rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+
+        .nav-btn:hover {
+            background-color: var(--hover-bg);
+            border-color: var(--text-muted);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .page-indicator {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .text-content {
+            font-size: 1.15rem;
+            line-height: 1.8;
+            color: #e2e8f0;
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+            white-space: pre-wrap;
+        }
+
+        /* Highlightable sentence */
+        .sentence {
+            border-radius: 0.2rem;
+            padding: 0 0.15rem;
+            cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s;
+            border-bottom: 1px dashed transparent;
+        }
+
+        .sentence:hover {
+            background-color: rgba(255, 255, 255, 0.06);
+            border-bottom-color: var(--text-muted);
+        }
+
+        .sentence.active-sentence {
+            background-color: var(--highlight-bg);
+            border-bottom-color: var(--accent-primary);
+            color: var(--text-highlight);
+            box-shadow: 0 0 8px rgba(124, 58, 237, 0.15);
+            font-weight: 500;
+        }
+
+        /* Iframe styling for raw PDF */
+        .pdf-frame-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 1rem;
+            overflow: hidden;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .pdf-frame {
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            border: none;
+        }
+
+        /* Welcome view when no book is active */
+        .welcome-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            gap: 1.5rem;
+            padding: 4rem;
+        }
+
+        .welcome-icon {
+            width: 5rem;
+            height: 5rem;
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(124, 58, 237, 0.3));
+            border: 1px solid var(--panel-border);
+            border-radius: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-icon svg {
+            width: 2.5rem;
+            height: 2.5rem;
+            fill: var(--accent-primary);
+        }
+
+        .welcome-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .welcome-desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            max-width: 400px;
+            line-height: 1.6;
+        }
+
+        /* Status Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateY(150%);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toast-icon.success {
+            background-color: rgba(16, 185, 129, 0.15);
+            fill: var(--accent-secondary);
+        }
+
+        .toast-icon.error {
+            background-color: rgba(239, 68, 68, 0.15);
+            fill: #ef4444;
+        }
+
+        .toast-message {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 3v18M12 3a9 9 0 0 0-9 9v9h9M12 3a9 9 0 0 1 9 9v9h-9"/>
+                </svg>
+            </div>
+            <h1>AI Book Reader</h1>
+        </div>
+        
+        <div class="user-badge">
+            <svg style="width: 1rem; height: 1rem; fill: var(--text-muted);" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+            <input type="text" id="user-id-input" value="default_user" placeholder="User ID" title="Press Enter to refresh library">
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <aside>
+            <!-- Upload Card -->
+            <div class="section-card">
+                <div class="section-title">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                    </svg>
+                    Upload PDF
+                </div>
+                <div class="upload-zone" id="drop-zone">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M7 16a4 4 0 0 1-.88-7.903A5 5 0 1 1 15.9 6L16 6a5 5 0 0 1 1 9.9M15 13l-3-3-3 3M12 10v9"/>
+                    </svg>
+                    <p>Drag & drop your PDF here</p>
+                    <p>or <span>browse files</span></p>
+                    <input type="file" id="file-input" accept="application/pdf">
+                </div>
+            </div>
+
+            <!-- Library Card -->
+            <div class="section-card" style="flex-grow: 1; display: flex; flex-direction: column;">
+                <div class="section-title">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20M4 19.5V3.5A2.5 2.5 0 0 1 6.5 1H20v21H6.5"/>
+                    </svg>
+                    Your Library
+                </div>
+                <div class="library-list" id="library-list">
+                    <!-- Dynamic List Items -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Area -->
+        <main>
+            <div class="workspace-header">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="reader">
+                        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                        Interactive Reader (TTS)
+                    </button>
+                    <button class="tab-btn" data-tab="pdf">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4 6h-4v2h4v2h-4v2h4v2H9V7h6v2z"/></svg>
+                        Original PDF View
+                    </button>
+                </div>
+
+                <!-- TTS Settings Panel -->
+                <div class="tts-controller" id="tts-controls" style="visibility: hidden;">
+                    <div class="control-group">
+                        <label for="voice-select">Voice</label>
+                        <select id="voice-select" style="max-width: 140px;"></select>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="rate-range" id="rate-label">Speed: 1x</label>
+                        <input type="range" id="rate-range" min="0.5" max="2" step="0.1" value="1">
+                    </div>
+
+                    <div class="tts-buttons">
+                        <button class="circle-btn" id="play-btn" title="Play">
+                            <svg viewBox="0 0 24 24" id="play-icon"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <button class="circle-btn" id="stop-btn" title="Stop">
+                            <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workspace Panels -->
+            <div class="workspace-content">
+                <!-- Welcome View -->
+                <div class="welcome-view" id="welcome-view">
+                    <div class="welcome-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 3v18M12 3a9 9 0 0 0-9 9v9h9M12 3a9 9 0 0 1 9 9v9h-9"/>
+                        </svg>
+                    </div>
+                    <div class="welcome-title">Select a Book to Start Reading</div>
+                    <div class="welcome-desc">Upload a PDF or choose a document from your library to read page contents and play them out loud with real-time text synchronization.</div>
+                </div>
+
+                <!-- Interactive Text Reader -->
+                <div class="content-panel" id="reader-panel">
+                    <div class="reader-card">
+                        <div class="reader-title-bar">
+                            <div class="reader-title" id="active-book-title">Book Title</div>
+                            <div class="page-navigation">
+                                <button class="nav-btn" id="prev-page-btn">Prev</button>
+                                <span class="page-indicator" id="page-num-display">Page 1 of 10</span>
+                                <button class="nav-btn" id="next-page-btn">Next</button>
+                            </div>
+                        </div>
+                        <div class="text-content" id="reader-text-container">
+                            <!-- Clickable highlighted text segments -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Original PDF View Panel -->
+                <div class="content-panel" id="pdf-panel">
+                    <div class="pdf-frame-container">
+                        <iframe class="pdf-frame" id="pdf-iframe" src="about:blank"></iframe>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Component -->
+    <div class="toast" id="toast">
+        <div class="toast-icon" id="toast-icon"></div>
+        <div class="toast-message" id="toast-msg">Success!</div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        const API_BASE = window.location.origin;
+
+        // Elements
+        const userIdInput = document.getElementById('user-id-input');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const libraryList = document.getElementById('library-list');
+        
+        const welcomeView = document.getElementById('welcome-view');
+        const readerPanel = document.getElementById('reader-panel');
+        const pdfPanel = document.getElementById('pdf-panel');
+        const activeBookTitle = document.getElementById('active-book-title');
+        const pageNumDisplay = document.getElementById('page-num-display');
+        const readerTextContainer = document.getElementById('reader-text-container');
+        const pdfIframe = document.getElementById('pdf-iframe');
+        
+        const prevPageBtn = document.getElementById('prev-page-btn');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const ttsControls = document.getElementById('tts-controls');
+        const voiceSelect = document.getElementById('voice-select');
+        const rateRange = document.getElementById('rate-range');
+        const rateLabel = document.getElementById('rate-label');
+        const playBtn = document.getElementById('play-btn');
+        const playIcon = document.getElementById('play-icon');
+        const stopBtn = document.getElementById('stop-btn');
+        
+        const toast = document.getElementById('toast');
+        const toastIcon = document.getElementById('toast-icon');
+        const toastMsg = document.getElementById('toast-msg');
+
+        // State
+        let activeTab = 'reader';
+        let currentUserId = 'default_user';
+        let books = [];
+        let activeBook = null;
+        let activeBookText = null; // { pages: [ { page: X, text: "" } ] }
+        let currentPageIndex = 0; // 0-based
+        let sentences = [];
+        
+        // TTS State
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let isPlaying = false;
+        let currentSentenceIndex = -1;
+        let activeUtterance = null;
+
+        // Icons
+        const playSvg = '<path d="M8 5v14l11-7z"/>';
+        const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+
+        // Load voices
+        function populateVoiceList() {
+            if (typeof speechSynthesis === 'undefined') return;
+            voices = synth.getVoices();
+            voiceSelect.innerHTML = '';
+            voices.forEach((voice) => {
+                const option = document.createElement('option');
+                option.textContent = `${voice.name} (${voice.lang})`;
+                option.value = voice.name;
+                if (voice.default) {
+                    option.selected = true;
+                }
+                voiceSelect.appendChild(option);
+            });
+        }
+        populateVoiceList();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = populateVoiceList;
+        }
+
+        // Display Toast Alerts
+        function showToast(message, isSuccess = true) {
+            toastMsg.innerText = message;
+            toastIcon.className = `toast-icon ${isSuccess ? 'success' : 'error'}`;
+            if (isSuccess) {
+                toastIcon.innerHTML = `<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>`;
+            } else {
+                toastIcon.innerHTML = `<svg style="width: 1rem; height: 1rem;" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>`;
+            }
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Tab Clicking
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeTab = btn.dataset.tab;
+                switchTab(activeTab);
+            });
+        });
+
+        function switchTab(tab) {
+            if (!activeBook) return;
+            if (tab === 'reader') {
+                readerPanel.classList.add('active');
+                pdfPanel.classList.remove('active');
+            } else {
+                readerPanel.classList.remove('active');
+                pdfPanel.classList.add('active');
+                if (pdfIframe.src === 'about:blank' || pdfIframe.src === '') {
+                    pdfIframe.src = `${API_BASE}/library/pdf/${activeBook.id}/file`;
+                }
+            }
+        }
+
+        // Fetch user books
+        async function fetchLibrary() {
+            currentUserId = userIdInput.value.trim() || 'default_user';
+            try {
+                const res = await fetch(`${API_BASE}/library/${currentUserId}`);
+                if (!res.ok) throw new Error("Network response error");
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    books = data;
+                } else {
+                    books = [];
+                }
+                renderLibrary();
+            } catch (err) {
+                console.error(err);
+                books = [];
+                renderLibrary();
+            }
+        }
+
+        // Render library list
+        function renderLibrary() {
+            libraryList.innerHTML = '';
+            if (books.length === 0) {
+                libraryList.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 1.5rem 0;">No books in library.</div>`;
+                return;
+            }
+
+            books.forEach(book => {
+                const item = document.createElement('div');
+                item.className = `book-item ${activeBook && activeBook.id === book.id ? 'active' : ''}`;
+                
+                item.innerHTML = `
+                    <div class="book-info">
+                        <div class="book-title" title="${book.title}">${book.title}</div>
+                        <div class="book-meta">
+                            <span>Pages: ${book.pages}</span>
+                            <span>ID: ${book.id}</span>
+                        </div>
+                    </div>
+                    <button class="delete-btn" title="Delete book">
+                        <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                    </button>
+                `;
+
+                // Handle select book click
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.delete-btn')) {
+                        deleteBook(book.id);
+                    } else {
+                        selectBook(book);
+                    }
+                });
+
+                libraryList.appendChild(item);
+            });
+        }
+
+        // Delete book
+        async function deleteBook(bookId) {
+            if (!confirm("Are you sure you want to delete this book?")) return;
+            try {
+                const res = await fetch(`${API_BASE}/delete/${bookId}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (res.ok && result.status === 'Success') {
+                    showToast("Book deleted successfully");
+                    if (activeBook && activeBook.id === bookId) {
+                        activeBook = null;
+                        activeBookText = null;
+                        welcomeView.style.display = 'flex';
+                        readerPanel.classList.remove('active');
+                        pdfPanel.classList.remove('active');
+                        ttsControls.style.visibility = 'hidden';
+                        stopSpeech();
+                    }
+                    fetchLibrary();
+                } else {
+                    showToast(result.message || "Failed to delete book", false);
+                }
+            } catch (err) {
+                showToast("Error deleting book", false);
+            }
+        }
+
+        // Select active book
+        async function selectBook(book) {
+            activeBook = book;
+            stopSpeech();
+            
+            // Highlight selected in library
+            document.querySelectorAll('.book-item').forEach(el => el.classList.remove('active'));
+            fetchLibrary(); // Updates UI highlight state
+
+            // Display loading
+            activeBookTitle.innerText = book.title;
+            readerTextContainer.innerHTML = `<p style="color: var(--text-muted); font-size: 0.95rem; text-align: center; margin-top: 2rem;">Extracting and loading text contents...</p>`;
+            
+            welcomeView.style.display = 'none';
+            switchTab(activeTab);
+            ttsControls.style.visibility = 'visible';
+
+            // Reset iframe URL to let it load dynamically when tab switches
+            pdfIframe.src = '';
+            if (activeTab === 'pdf') {
+                pdfIframe.src = `${API_BASE}/library/pdf/${book.id}/file`;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/library/pdf/${book.id}/text`);
+                if (!res.ok) throw new Error("Failed to load text");
+                activeBookText = await res.json();
+                
+                currentPageIndex = 0;
+                displayPage(0);
+            } catch (err) {
+                readerTextContainer.innerHTML = `<p style="color: #ef4444; font-size: 0.95rem; text-align: center; margin-top: 2rem;">Error extracting PDF text. Please verify PDF is not scanned or empty.</p>`;
+            }
+        }
+
+        // Display page content
+        function displayPage(pageIdx) {
+            if (!activeBookText || !activeBookText.pages || activeBookText.pages.length === 0) {
+                readerTextContainer.innerHTML = `<p style="color: var(--text-muted);">No readable text found in this document.</p>`;
+                return;
+            }
+            
+            const pageData = activeBookText.pages[pageIdx];
+            pageNumDisplay.innerText = `Page ${pageData.page} of ${activeBookText.pages.length}`;
+            
+            prevPageBtn.disabled = pageIdx === 0;
+            nextPageBtn.disabled = pageIdx === activeBookText.pages.length - 1;
+
+            // Stop any ongoing speech when switching page
+            stopSpeech();
+
+            // Extract sentences and display them as clickable spans
+            const rawText = pageData.text.trim();
+            if (!rawText) {
+                readerTextContainer.innerHTML = `<p style="color: var(--text-muted); font-style: italic; text-align: center; margin-top: 2rem;">This page seems to be empty or contains scanned images only.</p>`;
+                sentences = [];
+                return;
+            }
+
+            // Split into sentences using a simple but effective regex
+            sentences = rawText.match(/[^.!?]+[.!?]+(\s+|$)|[^.!?]+$/g) || [rawText];
+            sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+
+            readerTextContainer.innerHTML = '';
+            sentences.forEach((sentence, idx) => {
+                const span = document.createElement('span');
+                span.className = 'sentence';
+                span.dataset.idx = idx;
+                span.innerText = sentence + ' ';
+                
+                span.addEventListener('click', () => {
+                    startSpeechFrom(idx);
+                });
+
+                readerTextContainer.appendChild(span);
+            });
+        }
+
+        // File upload
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('user_id', currentUserId);
+
+            showToast("Uploading document...");
+
+            try {
+                const res = await fetch(`${API_BASE}/upload-pdf/`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await res.json();
+                if (res.ok && data.message === 'succes') {
+                    showToast("Uploaded successfully!");
+                    fetchLibrary();
+                } else {
+                    showToast("Upload failed", false);
+                }
+            } catch (err) {
+                showToast("Error uploading file", false);
+            }
+        }
+
+        // Drag and Drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type === 'application/pdf') {
+                uploadFile(files[0]);
+            } else {
+                showToast("Please drop a valid PDF file", false);
+            }
+        });
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', () => {
+            const files = fileInput.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+
+        userIdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                fetchLibrary();
+            }
+        });
+
+        // Reader controls
+        prevPageBtn.addEventListener('click', () => {
+            if (currentPageIndex > 0) {
+                currentPageIndex--;
+                displayPage(currentPageIndex);
+            }
+        });
+
+        nextPageBtn.addEventListener('click', () => {
+            if (activeBookText && currentPageIndex < activeBookText.pages.length - 1) {
+                currentPageIndex++;
+                displayPage(currentPageIndex);
+            }
+        });
+
+        // TTS Controls
+        rateRange.addEventListener('input', () => {
+            rateLabel.innerText = `Speed: ${rateRange.value}x`;
+            // If playing, update on the fly by restarting current sentence
+            if (isPlaying && currentSentenceIndex !== -1) {
+                synth.cancel();
+                speakSentence(currentSentenceIndex);
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (isPlaying) {
+                pauseSpeech();
+            } else {
+                resumeOrStartSpeech();
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            stopSpeech();
+        });
+
+        function startSpeechFrom(idx) {
+            synth.cancel();
+            isPlaying = true;
+            playIcon.innerHTML = pauseSvg;
+            speakSentence(idx);
+        }
+
+        function resumeOrStartSpeech() {
+            if (sentences.length === 0) return;
+            isPlaying = true;
+            playIcon.innerHTML = pauseSvg;
+
+            if (currentSentenceIndex === -1) {
+                speakSentence(0);
+            } else {
+                // If paused, browser can resume. Or we start speaking from the last active index.
+                if (synth.paused) {
+                    synth.resume();
+                } else {
+                    speakSentence(currentSentenceIndex);
+                }
+            }
+        }
+
+        function pauseSpeech() {
+            isPlaying = false;
+            playIcon.innerHTML = playSvg;
+            synth.pause();
+        }
+
+        function stopSpeech() {
+            isPlaying = false;
+            playIcon.innerHTML = playSvg;
+            synth.cancel();
+            currentSentenceIndex = -1;
+            removeSentenceHighlight();
+        }
+
+        function speakSentence(index) {
+            if (index < 0 || index >= sentences.length) {
+                stopSpeech();
+                return;
+            }
+
+            currentSentenceIndex = index;
+            highlightSentence(index);
+
+            // Auto-scroll to sentence
+            const span = readerTextContainer.querySelector(`.sentence[data-idx="${index}"]`);
+            if (span) {
+                span.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            activeUtterance = new SpeechSynthesisUtterance(sentences[index]);
+            
+            // Set options
+            const selectedVoiceName = voiceSelect.value;
+            const voice = voices.find(v => v.name === selectedVoiceName);
+            if (voice) activeUtterance.voice = voice;
+            
+            activeUtterance.rate = parseFloat(rateRange.value);
+
+            activeUtterance.onend = () => {
+                if (isPlaying) {
+                    speakSentence(index + 1);
+                }
+            };
+
+            activeUtterance.onerror = (e) => {
+                console.error("TTS utterance error:", e);
+                // Don't crash, try next sentence if playing
+                if (isPlaying) {
+                    setTimeout(() => speakSentence(index + 1), 100);
+                }
+            };
+
+            synth.speak(activeUtterance);
+        }
+
+        function highlightSentence(index) {
+            removeSentenceHighlight();
+            const span = readerTextContainer.querySelector(`.sentence[data-idx="${index}"]`);
+            if (span) {
+                span.classList.add('active-sentence');
+            }
+        }
+
+        function removeSentenceHighlight() {
+            document.querySelectorAll('.sentence').forEach(span => {
+                span.classList.remove('active-sentence');
+            });
+        }
+
+        // Initialize library
+        fetchLibrary();
+    </script>
+</body>
+</html>

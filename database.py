@@ -1,4 +1,7 @@
 #Database
+import string
+
+from pydantic.v1 import BaseModel
 from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
@@ -20,6 +23,21 @@ class PDF(Base):
     __tablename__ = "pdf"
     id = Column(Integer, primary_key=True)
     path = Column(String)
+    audio_path = Column(String)
+    time_stamp_path = Column(String)
     title = Column(String)
     pages = Column(Integer)
     user = Column(String)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    login = Column(String)
+    email = Column(String)
+    password = Column(String)
+
+
+class UserRegister(BaseModel):
+    login: str
+    password: str
+    email:str
