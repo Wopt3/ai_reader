@@ -23,3 +23,10 @@ class PDF(Base):
     title = Column(String)
     pages = Column(Integer)
     user = Column(String)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    login = Column(String, unique=True, index=True)
+    email = Column(String)
+    password = Column(String)

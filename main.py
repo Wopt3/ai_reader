@@ -18,21 +18,33 @@ def read_items(user_name: str, db: Session = Depends(database.get_db)):
     pdfs = db.query(database.PDF).filter(database.PDF.user == user_name).all()
     if not pdfs:
         return {"message": "No PDFs found for this user"}
+    
     return pdfs
 
 @app.get("/library/pdf/{pdf_id}")
-def read_item(pdf_id: int,
-              db: Session = Depends(database.get_db)):
+def read_item(pdf_id: int, db: Session = Depends(database.get_db)):
         pdf = db.query(database.PDF).filter(database.PDF.id == pdf_id).first()
-        if pdf is None:
-            return {"message": "PDF not found"}
+        if not pdf:
+            return {"message": "No PDFs found for this user"}
         return pdf
 
     
 
 @app.post("/register")
-def register(login:str, password:str):
-    pass
+def register(login:str, password:str,email:str, db: Session = Depends(database.get_db)):
+    existing_users_l = db.query(database.User).filter(database.User.login == login).first()
+    existing_users_e = db.query(database.User).filter(database.User.email == email).first()
+    if existing_users_l or existing_users_e:
+        return{"message":"there is already user with this login or email, write again!"}
+    new_user = database.User(
+        login=login,
+        password=password,
+        email=email
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return{"message": "User vreated correctly"}
 
 @app.post("/upload-pdf/")
 async def upload_pdf(
