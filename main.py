@@ -1,13 +1,19 @@
-from fastapi import FastAPI, File, UploadFile, Form, Depends
+from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from starlette import endpoints
+import glob
+
 import database
 
 import shutil
 import os
 import pdfPageCounter
 import PyPDF2
+import json
+import ttsEngine
+
 
 app = FastAPI()
 
@@ -115,7 +121,7 @@ async def upload_pdf(
     ):
     i:int = 0
     while True:
-        path = f"pdf_files/{file.filename}_{i}"
+        path = f"pdf_files/pdf/{file.filename}_{i}"
         if os.path.exists(path):
             i+=1
         else:
@@ -125,6 +131,8 @@ async def upload_pdf(
         shutil.copyfileobj(file.file, f)
     new_pdf=database.PDF(
         path=path,
+        audio_path="",
+        time_stamp_path="",
         title=file.filename,
         pages=pdfPageCounter.get_pdf_page_count(path),
         user=user_id
@@ -143,10 +151,23 @@ async def delete(pdf_id: int,
     pdf = db.query(database.PDF).filter(database.PDF.id == pdf_id).first()
     if pdf:
         pdf_path = pdf.path
+        page_count=pdf.pages
         db.delete(pdf)
         db.commit()
         try:
             os.remove(pdf_path)
+            for audio_file in glob.glob(f"pdf_files/audio/{pdf_id}_*.mp3"):
+                try:
+                    os.remove(audio_file)
+                except Exception:
+                    pass
+            # 2. Delete all page JSON timestamps for this book
+            for json_file in glob.glob(f"pdf_files/timestamps/{pdf_id}_*.json"):
+                try:
+                    os.remove(json_file)
+                except Exception:
+                    pass
+
         except:
             return {"message": "Error 404"}
 
@@ -163,3 +184,47 @@ def change_conf():
 @app.put("/log-in")
 def log_in(login:str, password:str):
     pass
+
+@app.get("/library/pdf/{pdf_id}/page/{page_num}/timestamps")
+async def get_timestamp(pdf_id: int,
+                        page_num: int,
+                        db:Session = Depends(database.get_db)):
+
+    pdf = db.query(database.PDF).filter(database.PDF.id == pdf_id).first()
+    if not pdf:
+        raise HTTPException(status_code=404, detail="Pdf not found")
+    audio_path = f"pdf_files/audio/{pdf_id}_{page_num}.mp3"
+    json_path = f"pdf_files/timestamps/{pdf_id}_{page_num}.json"
+    os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    with open(pdf.path, "rb") as f:
+        pdf_reader = PyPDF2.PdfReader(f)
+        page_text = pdf_reader.pages[page_num - 1].extract_text() or ""
+        timestamps = ttsEngine.synthesize_page(page_text, audio_path)
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(timestamps, f)
+
+    return timestamps
+
+@app.get("/library/pdf/{pdf_id}/page/{page_num}/audio")
+async def get_audio(pdf_id: int,
+                    page_num: int,
+                    db:Session = Depends(database.get_db)):
+    pdf = db.query(database.PDF).filter(database.PDF.id == pdf_id).first()
+    if not pdf:
+        raise HTTPException(status_code=404, detail="Pdf not found")
+    audio_path = f"pdf_files/audio/{pdf_id}_{page_num}.mp3"
+    if os.path.exists(audio_path):
+        return FileResponse(audio_path, media_type="audio/mpeg")
+    raise HTTPException(status_code=404, detail="audio and json not found")
+
+@app.put("/library/pdf/{pdf_id}/progress")
+def progress(pdf_id: int,last_page: int,db:Session = Depends(database.get_db)):
+    pdf = db.query(database.PDF).filter(database.PDF.id == pdf_id).first()
+    if pdf:
+        pdf.last_page = last_page
+
+        db.commit()

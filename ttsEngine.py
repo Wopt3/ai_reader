@@ -12,7 +12,7 @@ def synthesize_page(text: str,
     words = text.split()
     for idx, word in enumerate(words):
         escaped_word = word.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        ssml_parts.append(f'<mark name="{idx}"/>{escaped_word}')
+        ssml_parts.append(f'<mark name="{idx}"/>{escaped_word} ')
 
     ssml_parts.append('</speak>')
     ssml_string = "".join(ssml_parts)
@@ -21,10 +21,14 @@ def synthesize_page(text: str,
 
     voice = tts.VoiceSelectionParams(
         language_code="en-US",
-        name = "en-US-Wavenet-F"
+        name = "en-US-Neural2-J"  # High-quality female studio voice
     )
 
-    audio_config = tts.AudioConfig(audio_encoding = tts.AudioEncoding.MP3)
+    audio_config = tts.AudioConfig(
+        audio_encoding=tts.AudioEncoding.MP3,
+        speaking_rate=0.95,
+        pitch=-1.2
+    )
 
     request = tts.SynthesizeSpeechRequest(
         input = synthesis_input,

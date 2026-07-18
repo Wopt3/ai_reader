@@ -1,7 +1,7 @@
 #Database
 import string
 
-from pydantic.v1 import BaseModel
+from pydantic import BaseModel
 from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
@@ -28,6 +28,7 @@ class PDF(Base):
     title = Column(String)
     pages = Column(Integer)
     user = Column(String)
+    last_page = Column(Integer, default=1)
 
 class User(Base):
     __tablename__ = "users"
