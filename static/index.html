@@ -498,25 +498,26 @@
             white-space: pre-wrap;
         }
 
-        /* Highlightable sentence */
-        .sentence {
-            border-radius: 0.2rem;
-            padding: 0 0.15rem;
+        /* Highlightable word */
+        .word {
+            border-radius: 0.15rem;
+            padding: 0 0.05rem;
             cursor: pointer;
-            transition: background-color 0.15s, border-color 0.15s;
-            border-bottom: 1px dashed transparent;
+            transition: background-color 0.1s, color 0.1s;
+            border-bottom: 1px solid transparent;
+            display: inline-block;
         }
 
-        .sentence:hover {
-            background-color: rgba(255, 255, 255, 0.06);
-            border-bottom-color: var(--text-muted);
+        .word:hover {
+            background-color: rgba(124, 58, 237, 0.15);
+            border-bottom-color: var(--accent-primary);
         }
 
-        .sentence.active-sentence {
+        .word.active-word {
             background-color: var(--highlight-bg);
             border-bottom-color: var(--accent-primary);
             color: var(--text-highlight);
-            box-shadow: 0 0 8px rgba(124, 58, 237, 0.15);
+            box-shadow: 0 0 6px rgba(124, 58, 237, 0.15);
             font-weight: 500;
         }
 
@@ -718,11 +719,6 @@
                 <!-- TTS Settings Panel -->
                 <div class="tts-controller" id="tts-controls" style="visibility: hidden;">
                     <div class="control-group">
-                        <label for="voice-select">Voice</label>
-                        <select id="voice-select" style="max-width: 140px;"></select>
-                    </div>
-                    
-                    <div class="control-group">
                         <label for="rate-range" id="rate-label">Speed: 1x</label>
                         <input type="range" id="rate-range" min="0.5" max="2" step="0.1" value="1">
                     </div>
@@ -807,7 +803,6 @@
         
         const tabBtns = document.querySelectorAll('.tab-btn');
         const ttsControls = document.getElementById('tts-controls');
-        const voiceSelect = document.getElementById('voice-select');
         const rateRange = document.getElementById('rate-range');
         const rateLabel = document.getElementById('rate-label');
         const playBtn = document.getElementById('play-btn');
@@ -825,38 +820,42 @@
         let activeBook = null;
         let activeBookText = null; // { pages: [ { page: X, text: "" } ] }
         let currentPageIndex = 0; // 0-based
-        let sentences = [];
+        let words = [];
+        let wordTimestamps = []; // [ { word_index: X, start_time: Y } ]
         
-        // TTS State
-        const synth = window.speechSynthesis;
-        let voices = [];
+        // HTML5 Audio State
+        const audioPlayer = new Audio();
         let isPlaying = false;
-        let currentSentenceIndex = -1;
-        let activeUtterance = null;
+        let currentWordIndex = -1;
 
         // Icons
         const playSvg = '<path d="M8 5v14l11-7z"/>';
         const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
 
-        // Load voices
-        function populateVoiceList() {
-            if (typeof speechSynthesis === 'undefined') return;
-            voices = synth.getVoices();
-            voiceSelect.innerHTML = '';
-            voices.forEach((voice) => {
-                const option = document.createElement('option');
-                option.textContent = `${voice.name} (${voice.lang})`;
-                option.value = voice.name;
-                if (voice.default) {
-                    option.selected = true;
+        // Track playback position to highlight the correct word
+        audioPlayer.addEventListener('timeupdate', () => {
+            if (!wordTimestamps || wordTimestamps.length === 0) return;
+            const currentTime = audioPlayer.currentTime;
+            
+            // Find the word index corresponding to the current audio time
+            let activeIdx = -1;
+            for (let i = 0; i < wordTimestamps.length; i++) {
+                if (wordTimestamps[i].start_time <= currentTime) {
+                    activeIdx = wordTimestamps[i].word_index;
+                } else {
+                    break;
                 }
-                voiceSelect.appendChild(option);
-            });
-        }
-        populateVoiceList();
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-            speechSynthesis.onvoiceschanged = populateVoiceList;
-        }
+            }
+            
+            if (activeIdx !== -1 && activeIdx !== currentWordIndex) {
+                currentWordIndex = activeIdx;
+                highlightWord(activeIdx);
+            }
+        });
+
+        audioPlayer.addEventListener('ended', () => {
+            stopAudio();
+        });
 
         // Display Toast Alerts
         function showToast(message, isSuccess = true) {
@@ -968,7 +967,7 @@
                         readerPanel.classList.remove('active');
                         pdfPanel.classList.remove('active');
                         ttsControls.style.visibility = 'hidden';
-                        stopSpeech();
+                        stopAudio();
                     }
                     fetchLibrary();
                 } else {
@@ -982,7 +981,7 @@
         // Select active book
         async function selectBook(book) {
             activeBook = book;
-            stopSpeech();
+            stopAudio();
             
             // Highlight selected in library
             document.querySelectorAll('.book-item').forEach(el => el.classList.remove('active'));
@@ -1015,7 +1014,7 @@
         }
 
         // Display page content
-        function displayPage(pageIdx) {
+        async function displayPage(pageIdx) {
             if (!activeBookText || !activeBookText.pages || activeBookText.pages.length === 0) {
                 readerTextContainer.innerHTML = `<p style="color: var(--text-muted);">No readable text found in this document.</p>`;
                 return;
@@ -1027,34 +1026,52 @@
             prevPageBtn.disabled = pageIdx === 0;
             nextPageBtn.disabled = pageIdx === activeBookText.pages.length - 1;
 
-            // Stop any ongoing speech when switching page
-            stopSpeech();
+            // Stop any ongoing audio when switching page
+            stopAudio();
 
-            // Extract sentences and display them as clickable spans
+            // Extract words and display them as clickable spans
             const rawText = pageData.text.trim();
             if (!rawText) {
                 readerTextContainer.innerHTML = `<p style="color: var(--text-muted); font-style: italic; text-align: center; margin-top: 2rem;">This page seems to be empty or contains scanned images only.</p>`;
-                sentences = [];
+                words = [];
+                wordTimestamps = [];
                 return;
             }
 
-            // Split into sentences using a simple but effective regex
-            sentences = rawText.match(/[^.!?]+[.!?]+(\s+|$)|[^.!?]+$/g) || [rawText];
-            sentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
+            // Split into words by whitespace
+            words = rawText.split(/\s+/).filter(w => w.length > 0);
 
             readerTextContainer.innerHTML = '';
-            sentences.forEach((sentence, idx) => {
+            words.forEach((word, idx) => {
                 const span = document.createElement('span');
-                span.className = 'sentence';
+                span.className = 'word';
                 span.dataset.idx = idx;
-                span.innerText = sentence + ' ';
+                span.innerText = word + ' ';
                 
                 span.addEventListener('click', () => {
-                    startSpeechFrom(idx);
+                    jumpToWord(idx);
                 });
 
                 readerTextContainer.appendChild(span);
             });
+
+            // Set audio player source for the active page
+            audioPlayer.src = `${API_BASE}/library/pdf/${activeBook.id}/page/${pageData.page}/audio`;
+            audioPlayer.playbackRate = parseFloat(rateRange.value);
+            audioPlayer.load();
+
+            // Fetch timestamps for the active page
+            try {
+                const tsRes = await fetch(`${API_BASE}/library/pdf/${activeBook.id}/page/${pageData.page}/timestamps`);
+                if (tsRes.ok) {
+                    wordTimestamps = await tsRes.json();
+                } else {
+                    wordTimestamps = [];
+                }
+            } catch (err) {
+                console.error("Error loading timestamps:", err);
+                wordTimestamps = [];
+            }
         }
 
         // File upload
@@ -1136,118 +1153,76 @@
             }
         });
 
-        // TTS Controls
+        // Audio Playback Controls
         rateRange.addEventListener('input', () => {
             rateLabel.innerText = `Speed: ${rateRange.value}x`;
-            // If playing, update on the fly by restarting current sentence
-            if (isPlaying && currentSentenceIndex !== -1) {
-                synth.cancel();
-                speakSentence(currentSentenceIndex);
-            }
+            audioPlayer.playbackRate = parseFloat(rateRange.value);
         });
 
         playBtn.addEventListener('click', () => {
             if (isPlaying) {
-                pauseSpeech();
+                pauseAudio();
             } else {
-                resumeOrStartSpeech();
+                playAudio();
             }
         });
 
         stopBtn.addEventListener('click', () => {
-            stopSpeech();
+            stopAudio();
         });
 
-        function startSpeechFrom(idx) {
-            synth.cancel();
+        function playAudio() {
+            if (!audioPlayer.src) return;
             isPlaying = true;
             playIcon.innerHTML = pauseSvg;
-            speakSentence(idx);
+            audioPlayer.play().catch(err => {
+                console.error("Error playing audio:", err);
+                showToast("Error playing page audio", false);
+                isPlaying = false;
+                playIcon.innerHTML = playSvg;
+            });
         }
 
-        function resumeOrStartSpeech() {
-            if (sentences.length === 0) return;
-            isPlaying = true;
-            playIcon.innerHTML = pauseSvg;
+        function pauseAudio() {
+            isPlaying = false;
+            playIcon.innerHTML = playSvg;
+            audioPlayer.pause();
+        }
 
-            if (currentSentenceIndex === -1) {
-                speakSentence(0);
-            } else {
-                // If paused, browser can resume. Or we start speaking from the last active index.
-                if (synth.paused) {
-                    synth.resume();
-                } else {
-                    speakSentence(currentSentenceIndex);
-                }
+        function stopAudio() {
+            isPlaying = false;
+            playIcon.innerHTML = playSvg;
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+            currentWordIndex = -1;
+            removeWordHighlight();
+        }
+
+        function jumpToWord(idx) {
+            if (!wordTimestamps || wordTimestamps.length === 0) return;
+            
+            // Find the closest timestamp for the clicked word
+            const timestamp = wordTimestamps.find(ts => ts.word_index === idx);
+            if (timestamp) {
+                audioPlayer.currentTime = timestamp.start_time;
+                playAudio();
             }
         }
 
-        function pauseSpeech() {
-            isPlaying = false;
-            playIcon.innerHTML = playSvg;
-            synth.pause();
-        }
-
-        function stopSpeech() {
-            isPlaying = false;
-            playIcon.innerHTML = playSvg;
-            synth.cancel();
-            currentSentenceIndex = -1;
-            removeSentenceHighlight();
-        }
-
-        function speakSentence(index) {
-            if (index < 0 || index >= sentences.length) {
-                stopSpeech();
-                return;
-            }
-
-            currentSentenceIndex = index;
-            highlightSentence(index);
-
-            // Auto-scroll to sentence
-            const span = readerTextContainer.querySelector(`.sentence[data-idx="${index}"]`);
+        function highlightWord(index) {
+            removeWordHighlight();
+            const span = readerTextContainer.querySelector(`.word[data-idx="${index}"]`);
             if (span) {
+                span.classList.add('active-word');
+                
+                // Auto-scroll to keep active word in view
                 span.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
-
-            activeUtterance = new SpeechSynthesisUtterance(sentences[index]);
-            
-            // Set options
-            const selectedVoiceName = voiceSelect.value;
-            const voice = voices.find(v => v.name === selectedVoiceName);
-            if (voice) activeUtterance.voice = voice;
-            
-            activeUtterance.rate = parseFloat(rateRange.value);
-
-            activeUtterance.onend = () => {
-                if (isPlaying) {
-                    speakSentence(index + 1);
-                }
-            };
-
-            activeUtterance.onerror = (e) => {
-                console.error("TTS utterance error:", e);
-                // Don't crash, try next sentence if playing
-                if (isPlaying) {
-                    setTimeout(() => speakSentence(index + 1), 100);
-                }
-            };
-
-            synth.speak(activeUtterance);
         }
 
-        function highlightSentence(index) {
-            removeSentenceHighlight();
-            const span = readerTextContainer.querySelector(`.sentence[data-idx="${index}"]`);
-            if (span) {
-                span.classList.add('active-sentence');
-            }
-        }
-
-        function removeSentenceHighlight() {
-            document.querySelectorAll('.sentence').forEach(span => {
-                span.classList.remove('active-sentence');
+        function removeWordHighlight() {
+            document.querySelectorAll('.word').forEach(span => {
+                span.classList.remove('active-word');
             });
         }
 
