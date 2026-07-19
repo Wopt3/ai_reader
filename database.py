@@ -42,3 +42,7 @@ class UserRegister(BaseModel):
     login: str
     password: str
     email:str
+
+class TranslationRequest(BaseModel):
+    text: str
+    lang: str

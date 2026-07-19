@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from starlette import endpoints
+
 import glob
 
 import database
@@ -13,6 +14,7 @@ import pdfPageCounter
 import PyPDF2
 import json
 import ttsEngine
+import translateEngine
 
 
 app = FastAPI()
@@ -229,3 +231,7 @@ def progress(pdf_id: int,last_page: int,db:Session = Depends(database.get_db)):
 
         db.commit()
         return {"status": "success", "last_page": last_page}
+
+@app.post("/translate")
+async def translate(request:database.TranslationRequest):
+    return translateEngine.translate(request)
