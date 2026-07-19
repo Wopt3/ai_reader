@@ -228,3 +228,4 @@ def progress(pdf_id: int,last_page: int,db:Session = Depends(database.get_db)):
         pdf.last_page = last_page
 
         db.commit()
+        return {"status": "success", "last_page": last_page}

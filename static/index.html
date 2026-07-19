@@ -114,8 +114,7 @@
         }
 
         .container {
-            display: grid;
-            grid-template-columns: 350px 1fr;
+            display: flex;
             flex-grow: 1;
             height: calc(100vh - 73px);
             overflow: hidden;
@@ -123,6 +122,8 @@
 
         /* Sidebar Styling */
         aside {
+            width: 350px;
+            flex-shrink: 0;
             border-right: 1px solid var(--panel-border);
             background-color: rgba(17, 24, 39, 0.45);
             display: flex;
@@ -130,6 +131,45 @@
             padding: 1.5rem;
             gap: 1.5rem;
             overflow-y: auto;
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+        }
+
+        .sidebar-collapsed aside {
+            margin-left: -350px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Toggle Sidebar Button */
+        .toggle-sidebar-btn {
+            background-color: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--panel-border);
+            border-radius: 0.5rem;
+            color: var(--text-normal);
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-speed);
+            margin-right: 1rem;
+        }
+        
+        .toggle-sidebar-btn:hover {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: #ffffff;
+        }
+
+        .toggle-sidebar-btn svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            fill: currentColor;
+            transition: transform var(--transition-speed);
+        }
+
+        .sidebar-collapsed .toggle-sidebar-btn svg {
+            transform: rotate(180deg);
         }
 
         .section-card {
@@ -644,6 +684,86 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            header {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .container {
+                position: relative;
+                height: calc(100vh - 69px);
+            }
+
+            /* Transform sidebar into a mobile drawer overlay */
+            aside {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                z-index: 1000;
+                width: 85%;
+                max-width: 320px;
+                background-color: #0b0f19;
+                box-shadow: 5px 0 25px rgba(0, 0, 0, 0.5);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+                margin-left: 0 !important;
+                opacity: 1;
+            }
+
+            .sidebar-collapsed aside {
+                transform: translateX(-100%);
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            /* Backdrop overlay when sidebar is open */
+            .sidebar-overlay {
+                display: none;
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                backdrop-filter: blur(4px);
+                z-index: 999;
+            }
+
+            .container:not(.sidebar-collapsed) .sidebar-overlay {
+                display: block;
+            }
+
+            /* Main area padding adjustments */
+            .workspace-header {
+                padding: 1rem;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.75rem;
+            }
+
+            .tabs {
+                justify-content: center;
+            }
+
+            .tts-controller {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .workspace-content {
+                padding: 1rem;
+            }
+
+            .reader-card {
+                padding: 1.5rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -667,6 +787,8 @@
     </header>
 
     <div class="container">
+        <!-- Sidebar overlay for mobile drawer -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
         <!-- Sidebar -->
         <aside>
             <!-- Upload Card -->
@@ -704,6 +826,9 @@
         <!-- Main Area -->
         <main>
             <div class="workspace-header">
+                <button class="toggle-sidebar-btn" id="toggle-sidebar-btn" title="Toggle Sidebar">
+                    <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </button>
                 <!-- Tabs -->
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="reader">
@@ -1006,10 +1131,22 @@
                 if (!res.ok) throw new Error("Failed to load text");
                 activeBookText = await res.json();
                 
-                currentPageIndex = 0;
-                displayPage(0);
+                // Restore last visited page (1-based in DB, 0-based in UI)
+                currentPageIndex = (book.last_page && book.last_page > 0) ? book.last_page - 1 : 0;
+                displayPage(currentPageIndex);
             } catch (err) {
                 readerTextContainer.innerHTML = `<p style="color: #ef4444; font-size: 0.95rem; text-align: center; margin-top: 2rem;">Error extracting PDF text. Please verify PDF is not scanned or empty.</p>`;
+            }
+        }
+
+        // Save reading progress to backend
+        async function saveProgress(pdfId, pageNum) {
+            try {
+                await fetch(`${API_BASE}/library/pdf/${pdfId}/progress?last_page=${pageNum}`, {
+                    method: 'PUT'
+                });
+            } catch (err) {
+                console.error("Error saving progress:", err);
             }
         }
 
@@ -1025,6 +1162,9 @@
             
             prevPageBtn.disabled = pageIdx === 0;
             nextPageBtn.disabled = pageIdx === activeBookText.pages.length - 1;
+
+            // Save current page progress to database
+            saveProgress(activeBook.id, pageData.page);
 
             // Stop any ongoing audio when switching page
             stopAudio();
@@ -1136,6 +1276,24 @@
             if (e.key === 'Enter') {
                 fetchLibrary();
             }
+        });
+
+        // Toggle Sidebar
+        const containerElement = document.querySelector('.container');
+        const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+        // Collapse sidebar by default on mobile screens
+        if (window.innerWidth <= 768) {
+            containerElement.classList.add('sidebar-collapsed');
+        }
+
+        toggleSidebarBtn.addEventListener('click', () => {
+            containerElement.classList.toggle('sidebar-collapsed');
+        });
+
+        sidebarOverlay.addEventListener('click', () => {
+            containerElement.classList.add('sidebar-collapsed');
         });
 
         // Reader controls
