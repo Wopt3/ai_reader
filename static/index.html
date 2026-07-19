@@ -172,6 +172,64 @@
             transform: rotate(180deg);
         }
 
+        /* Translation Bar */
+        .translation-bar {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 2rem;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(16px);
+            z-index: 100;
+            transition: all var(--transition-speed);
+        }
+
+        .translation-content {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .word-original {
+            font-weight: 600;
+            color: var(--text-normal);
+        }
+
+        .word-arrow {
+            color: var(--accent-primary);
+            font-weight: bold;
+        }
+
+        .word-translated {
+            color: #a78bfa;
+            font-weight: 500;
+        }
+
+        .close-trans-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: color var(--transition-speed);
+        }
+
+        .close-trans-btn:hover {
+            color: #ffffff;
+        }
+
         .section-card {
             background-color: var(--panel-bg);
             border: 1px solid var(--panel-border);
@@ -844,6 +902,17 @@
                 <!-- TTS Settings Panel -->
                 <div class="tts-controller" id="tts-controls" style="visibility: hidden;">
                     <div class="control-group">
+                        <label for="lang-select">Translate to:</label>
+                        <select id="lang-select" style="background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); border-radius: 0.5rem; color: var(--text-normal); padding: 0.25rem 0.5rem; outline: none; cursor: pointer;">
+                            <option value="pl" selected>Polish</option>
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="de">German</option>
+                            <option value="fr">French</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
                         <label for="rate-range" id="rate-label">Speed: 1x</label>
                         <input type="range" id="rate-range" min="0.5" max="2" step="0.1" value="1">
                     </div>
@@ -877,10 +946,19 @@
                     <div class="reader-card">
                         <div class="reader-title-bar">
                             <div class="reader-title" id="active-book-title">Book Title</div>
-                            <div class="page-navigation">
-                                <button class="nav-btn" id="prev-page-btn">Prev</button>
-                                <span class="page-indicator" id="page-num-display">Page 1 of 10</span>
-                                <button class="nav-btn" id="next-page-btn">Next</button>
+                            <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+                                <!-- Font Size Controls -->
+                                <div class="font-size-controls" style="display: flex; align-items: center; gap: 0.25rem; background: rgba(0, 0, 0, 0.2); padding: 0.25rem 0.5rem; border-radius: 0.5rem; border: 1px solid var(--panel-border);">
+                                    <button class="nav-btn" id="decrease-font-btn" title="Decrease Font Size" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; min-width: auto; height: auto; border: none; background: transparent;">A-</button>
+                                    <span style="font-size: 0.8rem; color: var(--text-muted); min-width: 35px; text-align: center;" id="font-size-display">100%</span>
+                                    <button class="nav-btn" id="increase-font-btn" title="Increase Font Size" style="padding: 0.25rem 0.5rem; font-size: 0.8rem; min-width: auto; height: auto; border: none; background: transparent;">A+</button>
+                                </div>
+                                <!-- Page Navigation -->
+                                <div class="page-navigation">
+                                    <button class="nav-btn" id="prev-page-btn">Prev</button>
+                                    <span class="page-indicator" id="page-num-display">Page 1 of 10</span>
+                                    <button class="nav-btn" id="next-page-btn">Next</button>
+                                </div>
                             </div>
                         </div>
                         <div class="text-content" id="reader-text-container">
@@ -894,6 +972,16 @@
                     <div class="pdf-frame-container">
                         <iframe class="pdf-frame" id="pdf-iframe" src="about:blank"></iframe>
                     </div>
+                </div>
+
+                <!-- Floating Word Translation Bar -->
+                <div class="translation-bar" id="translation-bar" style="display: none;">
+                    <div class="translation-content">
+                        <span class="word-original" id="trans-original"></span>
+                        <span class="word-arrow">&rarr;</span>
+                        <span class="word-translated" id="trans-translated"></span>
+                    </div>
+                    <button class="close-trans-btn" id="close-trans-btn" title="Close translation">&times;</button>
                 </div>
             </div>
         </main>
@@ -938,9 +1026,23 @@
         const toastIcon = document.getElementById('toast-icon');
         const toastMsg = document.getElementById('toast-msg');
 
+        // Translation Elements
+        const langSelect = document.getElementById('lang-select');
+        const translationBar = document.getElementById('translation-bar');
+        const transOriginal = document.getElementById('trans-original');
+        const transTranslated = document.getElementById('trans-translated');
+        const closeTransBtn = document.getElementById('close-trans-btn');
+
+        // Font Size Elements
+        const decreaseFontBtn = document.getElementById('decrease-font-btn');
+        const increaseFontBtn = document.getElementById('increase-font-btn');
+        const fontSizeDisplay = document.getElementById('font-size-display');
+
         // State
         let activeTab = 'reader';
         let currentUserId = 'default_user';
+        let selectedLanguage = 'pl';
+        let currentFontSizePercent = 100;
         let books = [];
         let activeBook = null;
         let activeBookText = null; // { pages: [ { page: X, text: "" } ] }
@@ -957,12 +1059,16 @@
         const playSvg = '<path d="M8 5v14l11-7z"/>';
         const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
 
-        // Track playback position to highlight the correct word
-        audioPlayer.addEventListener('timeupdate', () => {
+        let animationFrameId = null;
+
+        function updatePlaybackHighlight() {
             if (!wordTimestamps || wordTimestamps.length === 0) return;
-            const currentTime = audioPlayer.currentTime;
             
-            // Find the word index corresponding to the current audio time
+            // Apply a small lookahead offset (e.g. 0.05 seconds / 50ms)
+            // to compensate for minor audio output latency without skipping ahead on fast words
+            const latencyOffset = 0.05;
+            const currentTime = audioPlayer.currentTime + latencyOffset;
+            
             let activeIdx = -1;
             for (let i = 0; i < wordTimestamps.length; i++) {
                 if (wordTimestamps[i].start_time <= currentTime) {
@@ -973,6 +1079,44 @@
             }
             
             if (activeIdx !== -1 && activeIdx !== currentWordIndex) {
+                currentWordIndex = activeIdx;
+                highlightWord(activeIdx);
+            }
+            
+            if (isPlaying) {
+                animationFrameId = requestAnimationFrame(updatePlaybackHighlight);
+            }
+        }
+
+        // Track playback position to highlight the correct word with sub-frame accuracy
+        audioPlayer.addEventListener('play', () => {
+            isPlaying = true;
+            playIcon.innerHTML = pauseSvg;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            updatePlaybackHighlight();
+        });
+
+        audioPlayer.addEventListener('pause', () => {
+            isPlaying = false;
+            playIcon.innerHTML = playSvg;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        });
+
+        audioPlayer.addEventListener('seeking', () => {
+            const latencyOffset = 0.05;
+            const currentTime = audioPlayer.currentTime + latencyOffset;
+            let activeIdx = -1;
+            for (let i = 0; i < wordTimestamps.length; i++) {
+                if (wordTimestamps[i].start_time <= currentTime) {
+                    activeIdx = wordTimestamps[i].word_index;
+                } else {
+                    break;
+                }
+            }
+            if (activeIdx !== -1) {
                 currentWordIndex = activeIdx;
                 highlightWord(activeIdx);
             }
@@ -1166,6 +1310,9 @@
             // Save current page progress to database
             saveProgress(activeBook.id, pageData.page);
 
+            // Hide translation bar when shifting pages
+            translationBar.style.display = 'none';
+
             // Stop any ongoing audio when switching page
             stopAudio();
 
@@ -1296,6 +1443,49 @@
             containerElement.classList.add('sidebar-collapsed');
         });
 
+        // Update language preference on dropdown change
+        langSelect.addEventListener('change', async () => {
+            selectedLanguage = langSelect.value;
+            const userId = parseInt(currentUserId) || 1;
+            try {
+                const res = await fetch(`${API_BASE}/update-language?user_id=${userId}&language=${selectedLanguage}`, {
+                    method: 'PUT'
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    showToast(`Language updated to ${selectedLanguage}`);
+                }
+            } catch (err) {
+                console.error("Error saving language preference:", err);
+            }
+        });
+
+        // Close translation bar on click
+        closeTransBtn.addEventListener('click', () => {
+            translationBar.style.display = 'none';
+        });
+
+        // Font Size Controls
+        decreaseFontBtn.addEventListener('click', () => {
+            if (currentFontSizePercent > 70) {
+                currentFontSizePercent -= 10;
+                updateFontSize();
+            }
+        });
+
+        increaseFontBtn.addEventListener('click', () => {
+            if (currentFontSizePercent < 160) {
+                currentFontSizePercent += 10;
+                updateFontSize();
+            }
+        });
+
+        function updateFontSize() {
+            fontSizeDisplay.innerText = `${currentFontSizePercent}%`;
+            // Set scale factor relative to 1.15rem default
+            readerTextContainer.style.fontSize = `${(1.15 * currentFontSizePercent) / 100}rem`;
+        }
+
         // Reader controls
         prevPageBtn.addEventListener('click', () => {
             if (currentPageIndex > 0) {
@@ -1363,7 +1553,41 @@
             const timestamp = wordTimestamps.find(ts => ts.word_index === idx);
             if (timestamp) {
                 audioPlayer.currentTime = timestamp.start_time;
-                playAudio();
+                pauseAudio(); // Pause audio on click
+                highlightWord(idx);
+                currentWordIndex = idx;
+                
+                // Translate clicked word
+                translateWord(words[idx]);
+            }
+        }
+
+        async function translateWord(wordText) {
+            if (!wordText) return;
+            const cleanWord = wordText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").trim();
+            if (!cleanWord) return;
+
+            transOriginal.innerText = cleanWord;
+            transTranslated.innerText = "Translating...";
+            translationBar.style.display = 'flex';
+
+            try {
+                const res = await fetch(`${API_BASE}/translate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: cleanWord,
+                        lang: selectedLanguage
+                    })
+                });
+                if (!res.ok) throw new Error("Translation failed");
+                const translatedText = await res.json();
+                transTranslated.innerText = translatedText;
+            } catch (err) {
+                console.error("Translation error:", err);
+                transTranslated.innerText = "Error";
             }
         }
 

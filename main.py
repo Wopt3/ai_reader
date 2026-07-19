@@ -108,7 +108,8 @@ def register(user_data: database.UserRegister,
     new_user = database.User(
         login=user_data.login,
         password=user_data.password,
-        email=user_data.email
+        email=user_data.email,
+        language = "en"
     )
     db.add(new_user)
     db.commit()
@@ -234,4 +235,14 @@ def progress(pdf_id: int,last_page: int,db:Session = Depends(database.get_db)):
 
 @app.post("/translate")
 async def translate(request:database.TranslationRequest):
-    return translateEngine.translate(request)
+    return translateEngine.translate_text(request.text, request.lang)
+
+@app.put("/update-language")
+def update_language(user_id :int,language: str,db:Session = Depends(database.get_db)):
+    user = db.query(database.User).filter(database.User.id == user_id).first()
+    if user:
+        user.language = language
+        db.commit()
+
+        return {"status": "success", "language": language}
+    return {"status": "error", "language": language}

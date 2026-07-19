@@ -36,6 +36,7 @@ class User(Base):
     login = Column(String)
     email = Column(String)
     password = Column(String)
+    language = Column(String)
 
 
 class UserRegister(BaseModel):
