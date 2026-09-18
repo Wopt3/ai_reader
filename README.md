@@ -71,9 +71,3 @@ Once the server is running, navigate to:
 * **Redoc Docs:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ---
-
-## 🔮 Future Roadmap (Synchronization Feature)
-To achieve full audio-text synchronization:
-1. **Extend Database Schema**: Add `audio_path` and `timestamp_path` columns to link each book to its audio narration and word-timing metadata.
-2. **Word-Level Bounding / Forced Alignment**: Use a TTS engine (like Azure/Google Cloud Speech Marks) or a transcription engine (like OpenAI Whisper with word-level timestamps) to generate a JSON map of words matching their audio start times.
-3. **Frontend Integration**: Render the PDF using `pdf.js` with its Text Layer builder. Attach click events to the word spans that seek a standard HTML5 `<audio>` player to the matching timestamp in the JSON map.
