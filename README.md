@@ -2,7 +2,6 @@
 
 A modern, fast, and robust backend built with **FastAPI** and **SQLAlchemy** for an interactive, audio-synced book reader application.
 
-The core feature of this application is rendering PDF books with an interactive frontend text layer that synchronizes with MP3 audiobooks, allowing users to click a word in the PDF and jump directly to its spoken timestamp in the audio file.
 
 ---
 
@@ -15,7 +14,7 @@ The core feature of this application is rendering PDF books with an interactive 
   * Safely delete books from the PostgreSQL database and clean up the associated physical files on disk without risking orphaned database records.
 * **Automatic Database Initialization**: Checks and initializes the database tables automatically when the server starts.
 * **Dockerized Database**: Easy setup of the PostgreSQL database using Docker Compose.
-
+* Integrated Google Text-to-Speech API for MP4 generation with word-level timestamp mapping.
 ---
 
 ## 🛠️ Tech Stack
